@@ -1,0 +1,5 @@
+Selection	View	Channel	Begin Time (s)	End Time (s)	Low Freq (Hz)	High Freq (Hz)	Begin File	Begin Path	subtipos
+1	Spectrogram 1	1	405.234171443	405.248037021	36821.7	41424.4	742-B5-A30_0076.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0076.flac	1
+2	Spectrogram 1	1	410.506217886	410.514268867	23982.6	30523.3	742-B5-A30_0076.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0076.flac	1
+3	Spectrogram 1	1	410.533501766	410.541329108	26647.3	33188.0	742-B5-A30_0076.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0076.flac	4
+4	Spectrogram 1	1	700.249365091	700.260547009	31492.2	44089.1	742-B5-A30_0076.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0076.flac	4

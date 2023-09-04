@@ -1,0 +1,24 @@
+Selection	View	Channel	Begin Time (s)	End Time (s)	Low Freq (Hz)	High Freq (Hz)	Begin File	Begin Path	subtipos
+1	Spectrogram 1	1	6.340379453	6.348946783	64736.3	74152.5	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+2	Spectrogram 1	1	57.336186306	57.366862873	28484.0	44726.9	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+3	Spectrogram 1	1	57.464696248	57.490950968	32485.9	40725.0	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+4	Spectrogram 1	1	58.145384763	58.185181391	33427.5	44726.9	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+5	Spectrogram 1	1	116.128814341	116.144567172	34839.9	41902.1	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+6	Spectrogram 1	1	157.599957584	157.620961359	67325.8	90160.1	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	6
+7	Spectrogram 1	1	255.200675367	255.224719162	31428.6	45000.0	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+8	Spectrogram 1	1	308.743737511	308.768057672	31666.7	45714.3	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	6
+9	Spectrogram 1	1	339.472822103	339.494378610	37619.0	50238.1	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+10	Spectrogram 1	1	339.649419638	339.664619738	35238.1	45952.4	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+11	Spectrogram 1	1	361.333060618	361.345773430	31904.8	50714.3	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	6
+12	Spectrogram 1	1	394.085420650	394.098962558	33095.2	45000.0	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+13	Spectrogram 1	1	466.395090467	466.428807054	25476.2	36428.6	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+14	Spectrogram 1	1	466.473301894	466.488501995	22381.0	33809.5	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+15	Spectrogram 1	1	607.138695914	607.154172381	68809.5	75952.4	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+16	Spectrogram 1	1	705.500253220	705.515453321	22857.1	32619.0	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+17	Spectrogram 1	1	768.119170895	768.138240112	41904.8	50476.2	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+18	Spectrogram 1	1	786.298500090	786.322820251	38809.5	50000.0	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+19	Spectrogram 1	1	786.297670994	786.304580130	60952.4	70000.0	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+20	Spectrogram 1	1	816.518249872	816.553624652	42381.0	47619.0	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+21	Spectrogram 1	1	816.534831800	816.552242825	57381.0	66190.5	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+22	Spectrogram 1	1	823.023343145	823.036055956	32857.1	42619.0	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
+23	Spectrogram 1	1	871.713435562	871.738861185	31904.8	37142.9	742-B5-A30_0079.flac	/home/bryan/Desktop/Audios_revisados/742-B5-A30_0079.flac	4
