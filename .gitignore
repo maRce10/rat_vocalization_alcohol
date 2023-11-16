@@ -2,3 +2,4 @@
 .Rhistory
 .RData
 .Ruserdata
+data/processed/random_forest_model_results.RDS

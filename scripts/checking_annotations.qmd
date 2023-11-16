@@ -1,0 +1,499 @@
+---
+title: Classifying USV subtypes
+subtitle: Rat vocalization and alcohol
+author: <a href="https://marce10.github.io/">Marcelo Araya-Salas</a>
+date: "`r Sys.Date()`"
+toc: true
+toc-depth: 2
+toc-location: left
+number-sections: true
+highlight-style: pygments
+format:
+  html:
+    df-print: kable
+    code-fold: true
+    code-tools: true
+    css: qmd.css
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{=html}
+<style>
+body
+  { counter-reset: source-line 0; }
+pre.numberSource code
+  { counter-reset: none; }
+</style>
+```
+
+```{r set root directory, echo = FALSE}
+
+# set working directory as project directory or one directory above,
+knitr::opts_knit$set(root.dir = "..")
+
+```
+
+```{r add link to github repo, echo = FALSE, results='asis'}
+
+# print link to github repo if any
+if (file.exists("./.git/config")){
+  config <- readLines("./.git/config")
+  url <- grep("url",  config, value = TRUE)
+  url <- gsub("\\turl = |.git$", "", url)
+  cat("\nSource code and data found at [", url, "](", url, ")", sep = "")
+  }
+
+```
+
+```{r setup style, echo = FALSE, message = FALSE, warning=FALSE}
+
+# options to customize chunk outputs
+knitr::opts_chunk$set(
+  class.source = "numberLines lineAnchors", # for code line numbers
+  tidy.opts = list(width.cutoff = 65), 
+  tidy = TRUE,
+  message = FALSE
+ )
+
+```
+
+
+&nbsp; 
+
+<!-- skyblue box -->
+
+<div class="alert alert-info">
+
+# Purpose
+
+- Classify subtypes based on structure
+- Determine multi-element subtypes based on composing single subtypes
+
+</div>
+
+&nbsp; 
+
+
+<!-- light brown box -->
+<div class="alert alert-warning">
+
+# Report overview
+
+  - [Acoustic analysis](#acoustic-analysis)
+  - [Statistical analysis](#statistical-analysis)
+
+</div>
+
+&nbsp;
+
+
+# Load packages {.unnumbered .unlisted}
+
+```{r load packages}
+
+# knitr is require for creating html/pdf/word reports
+# formatR is used for soft-wrapping code
+
+# install/ load packages
+sketchy::load_packages(packages = c("knitr", "formatR", "viridis", "warbleR", github = "maRce10/Rraven", github = "maRce10/warbleR", github = "maRce10/ohun", "caret", "randomForest"))
+
+warbleR_options(wav.path = "/media/m/Expansion/audios_cin_alcohol_2023")
+
+```
+
+# Read data {.unnumbered .unlisted}
+```{r, eval = TRUE}
+
+anns <- imp_raven("./data/processed/annotations", warbler.format = TRUE, all.data = TRUE)
+
+
+anns$subc <- anns$subtipos_completo <- NULL
+
+anns <- anns[!is.na(anns$subtipos), ]
+
+anns$subtipos[anns$subtipos  %in% c(5, 44)] <- 4
+
+anns <- anns[order(anns$sound.files, anns$start), ]
+
+nrow(anns)
+anns <- anns[anns$start < anns$end, ]
+
+anns$subtype.label <- NA
+
+anns$subtype.label[anns$subtipos == 22] <- "22 kHz"
+anns$subtype.label[anns$subtipos == 1] <- "flat"
+anns$subtype.label[anns$subtipos == 4] <- "trill"
+anns$subtype.label[anns$subtipos == 6] <- "complex"
+
+```
+
+# Describe annotations on single element subtypes
+
+Proportion of calls per subtype 
+```{r}
+
+count_types <- round(table(anns$subtype.label)/ nrow(anns), 2)
+
+count_types <- as.data.frame(count_types)
+
+count_types$Count <- as.vector(table(anns$subtype.label))
+names(count_types) <- c("Subtype", "Proportion", "Count")
+
+count_types
+```
+
+
+# Measure acoustic structure
+
+Acoustic structure measured as spectrographic/spectrum/envelope features as well as statistical descriptors of Mel frequency cepstral coefficients 
+```{r, eval = FALSE}
+
+cs <- check_sels(anns, parallel = 1)
+
+sp <- spectro_analysis(anns, parallel = 5, ovlp = 70)
+mfccs <- mfcc_stats(anns, parallel = 5, ovlp = 70)
+
+anns_sp <- merge(anns, sp)
+
+anns_sp <- merge(anns_sp, mfccs)
+colnames(anns_sp)
+
+write.csv(anns_sp, "./data/processed/annotations_and_spectrogram_and_mel_features.csv", row.names = FALSE)
+
+```
+
+# Multi-element composed subtypes
+
+- Define as those in which single elements are within a 5 ms range
+
+```{r, eval = FALSE}
+anns <- read.csv("./data/processed/annotations_and_spectrogram_and_mel_features.csv")
+
+anns$true.end <- anns$end 
+
+anns$end <- anns$end + 0.005 
+
+anns <- overlapping_sels(anns)
+
+anns$end <- anns$true.end
+
+anns$true.end <- NULL
+
+# add song label to elements
+anns$composed.subtype <- anns$ovlp.sels
+
+for(i in seq_len(nrow(anns)))
+    if (is.na(anns$composed.subtype[i]))
+        anns$composed.subtype[i] <- max(anns$composed.subtype, na.rm = TRUE) + 1
+
+write.csv(anns, "./data/processed/annotations_groups_spectrogram_and_mel_features.csv", row.names = FALSE)
+```
+
+
+```{r, eval = FALSE}
+
+anns <- read.csv("./data/processed/annotations_groups_spectrogram_and_mel_features.csv")
+
+
+composed_anns_list <- lapply(unique(na.omit(anns$ovlp.sels)), function(x){ 
+    
+    data.frame(sound.files = anns$sound.files[anns$ovlp.sels == x & !is.na(anns$ovlp.sels)][1],
+               selec = x,
+               start = min(anns$start[anns$ovlp.sels == x & !is.na(anns$ovlp.sels)]),
+               end = max(anns$end[anns$ovlp.sels == x & !is.na(anns$ovlp.sels)]),
+               bottom.freq = min(anns$bottom.freq[anns$ovlp.sels == x & !is.na(anns$ovlp.sels)]),
+               top.freq = max(anns$top.freq[anns$ovlp.sels == x & !is.na(anns$ovlp.sels)]),
+               subtypes = paste(anns$subtipos[anns$ovlp.sels == x & !is.na(anns$ovlp.sels)], collapse = "-"),
+               composed.subtype = x,
+               count.subtypes = sum(anns$ovlp.sels == x & !is.na(anns$ovlp.sels))
+               )
+    })
+
+composed_anns <- do.call(rbind, composed_anns_list)
+
+# unique(composed_anns$subtypes)
+
+
+# subtypes <- c(1 = "flat", 4 = "trill", 6 = "complejas", 22 = "22 kHz")
+
+# add labels
+composed_anns$composed.subtype.label <- NA
+
+# of it contain complex subtype then is complex
+composed_anns$composed.subtype.label <- ifelse(grepl("6", composed_anns$subtypes), "composed.complex", composed_anns$composed.subtype.label)
+
+# of it contain 3 or more elements it is complex
+composed_anns$composed.subtype.label <- ifelse(composed_anns$count.subtypes >= 3, "composed.complex", composed_anns$composed.subtype.label)
+
+# 1-4 and 4-1 is a 3 (trill flat steps)
+composed_anns$composed.subtype.label <- ifelse(grepl("^1-4$|^4-1$", composed_anns$subtypes), "step.flat.trill", composed_anns$composed.subtype.label)
+
+# if it has at least two adjacent 4 ("4-4" two trills) and the frequency change is equal or higher than 5 kHz it is a step
+composed_anns$composed.subtype.label <- sapply(seq_len(nrow(composed_anns)), function(x){
+    
+    if(sum(grepl("4-4", composed_anns$subtypes[x])) & composed_anns$count.subtypes[x] == 2) {
+        
+        peakfs <- anns$meanpeakf[anns$composed.subtype ==  composed_anns$composed.subtype[x]]
+        
+        diff_freq <- abs(peakfs[1] - peakfs[2])
+        
+    out <- if (diff_freq >= 5) "step.trill" else 
+        "composed.trill"    
+    } else out <- composed_anns$composed.subtype.label[x]
+    
+    return(out)
+})
+
+# if it has at least two adjacent 1 ("1-1" two flats) and the frequency change is equal or higher than 5 kHz it is a step
+composed_anns$composed.subtype.label <- sapply(seq_len(nrow(composed_anns)), function(x){
+    
+    if(sum(grepl("1-1", composed_anns$subtypes[x])) & composed_anns$count.subtypes[x] == 2) {
+        
+        peakfs <- anns$meanpeakf[anns$composed.subtype ==  composed_anns$composed.subtype[x]]
+        
+        diff_freq <- abs(peakfs[1] - peakfs[2])
+        
+    out <- if (diff_freq >= 5) "step.flat" else 
+        "composed.flat"    
+    } else out <- composed_anns$composed.subtype.label[x]
+    
+    return(out)
+})
+
+unique(composed_anns$subtypes[composed_anns$count.subtypes == 2 & is.na(composed_anns$composed.subtype.label)])
+
+round(table(composed_anns$composed.subtype.label)/ nrow(composed_anns), 2)
+
+composed_anns$subtype.label <- ifelse(grepl("step", composed_anns$composed.subtype.label), "step", composed_anns$composed.subtype.label)
+
+composed_anns$subtype.label <- ifelse(grepl("complex", composed_anns$composed.subtype.label), "complex", composed_anns$composed.subtype.label)
+
+
+composed_anns$subtype.label <- ifelse(grepl("composed.trill", composed_anns$composed.subtype.label), "trill", composed_anns$subtype.label)
+
+write.csv(composed_anns, "./data/processed/annotations_composed_subtypes_5ms.csv", row.names = FALSE)
+
+cols <- intersect(colnames(anns), colnames(composed_anns))
+
+combined_anns <- rbind(anns[is.na(anns$ovlp.sels), cols], composed_anns[, cols])
+
+write.csv(combined_anns, "./data/processed/annotations_simple_and_composed_subtypes_5ms.csv", row.names = FALSE)
+
+```
+
+# Summary
+
+Proportion of calls per subtype composed subtypes
+```{r}
+
+composed_anns <- read.csv("./data/processed/annotations_composed_subtypes_5ms.csv")
+
+count_types <- round(table(composed_anns$composed.subtype.label)/ nrow(composed_anns), 2)
+
+count_types <- as.data.frame(count_types)
+
+count_types$Count <- as.vector(table(composed_anns$composed.subtype.label))
+names(count_types) <- c("Subtype", "Proportion", "Count")
+
+count_types
+```
+
+Proportion of calls per subtype single and composed subtypes
+```{r}
+
+combined_anns <- read.csv("./data/processed/annotations_simple_and_composed_subtypes_5ms.csv")
+
+count_types <- round(table(combined_anns$subtype.label)/ nrow(combined_anns), 2)
+
+count_types <- as.data.frame(count_types)
+
+count_types$Count <- as.vector(table(combined_anns$subtype.label))
+names(count_types) <- c("Subtype", "Proportion", "Count")
+
+count_types
+
+```
+
+# Create spectrograms
+```{r, eval = FALSE}
+
+types <- unique(combined_anns$subtype.label)
+
+for(i in types){
+    X <- combined_anns[combined_anns$subtype.label == i, ]
+    catalog(X = X, nrow = 10, ncol = 12, same.time.scale = T, mar = 0.001, res = 100, pb = FALSE, spec.mar = 0.001, max.group.cols = 5, title = i, ovlp = 50, wl = 512, width = 15, height = 9, hatching = 0, cex = 1.3, fast.spec = FALSE, pal = viridis, img.prefix = i, rm.axes = TRUE, flim = c(min(X$bottom.freq), max(X$top.freq)) + c(-5, 5), alpha = 0.25, collevels = seq(-120, 0, 5), box = FALSE, lab.mar = 0.00001)
+
+    move_images(from = .Options$warbleR$path, to = "./output/catalogs", overwrite = TRUE, cut = TRUE, pb = FALSE)
+}
+
+```
+
+# Classification
+## Random forest
+```{r, eval = FALSE}
+
+elm_anns <- read.csv("./data/processed/annotations_groups_spectrogram_and_mel_features.csv")
+
+elm_anns <- elm_anns[elm_anns$subtype.label != "22", ]
+
+
+# remove collinear
+target_features <- names(elm_anns)[!names(elm_anns) %in%  c("sound.files", "selec", "View", "Channel", "start", "end", "bottom.freq", "top.freq", "Delta.Time..s.", "Begin.File", "subtipos", "selec.file", "true.end", "ovlp.sels", "composed.subtype", "subtype.label", names(elm_anns)[sapply(elm_anns, anyNA)])]
+
+cormat <- cor(elm_anns[, target_features], use = "pairwise.complete.obs")
+hc <- findCorrelation(cormat, cutoff= 0.9) # putt any value as a "cutoff" 
+hc <- sort(hc)
+
+target_features <- target_features[hc]
+
+# Create data subsets
+partition <- createDataPartition(
+    y = elm_anns$subtype.label,
+    times = 1,
+    p = 0.75,
+    list = FALSE
+)
+
+
+
+elm_anns$subtype.label <- as.factor(elm_anns$subtype.label)
+
+trainset <- elm_anns[partition, c(target_features, "subtype.label")]
+testset <- elm_anns[-partition, c(target_features, "subtype.label")]
+
+trcontrol <-
+    trainControl(
+        method = "repeatedcv",
+        number = 100,
+        repeats = 100,
+        savePredictions = TRUE,
+        sampling = "down",
+        classProbs = TRUE,
+        returnResamp = "all"
+    )
+
+pred_model <- train(
+    subtype.label ~ .,
+    data = trainset,
+    method = "rf",
+    trControl = trcontrol,
+    metric = "Accuracy",
+    preProcess = "scale"
+)
+
+ggplot(pred_model) + theme_bw()
+
+# save confusion matrix
+conf_mat <-
+    confusionMatrix(predict(pred_model, testset), testset$subtype.label)
+
+conf_df <- as.data.frame(conf_mat$table)
+
+conf_df$total <-
+    sapply(conf_df$Reference, function(x)
+        sum(testset$subtype.label ==
+                x))
+
+conf_df$proportion <- conf_df$Freq / conf_df$total
+
+# fit model on complete data set
+best_rf_model <- pred_model$finalModel
+
+# all_rf_model <- randomForest(
+#   subtype.label ~ .,
+#   data = elm_anns[, c(target_features, "subtype.label")],  # Your entire dataset
+#   proximity = TRUE,  # Include proximity matrix
+#   ntree = best_rf_model$ntree,  # Number of trees
+#   mtry = best_rf_model$mtry,    # Number of variables tried for splitting at each node
+#   nodesize = best_rf_model$nodesize,  # Minimum size of terminal nodes
+#   maxnodes = best_rf_model$maxnodes  # Maximum number of terminal nodes
+# )
+
+rf_model_results <-
+    list(
+        pred_model_bb = pred_model,
+        conf_mat_bb = conf_mat,
+        confusion_df_bb = conf_df,
+        testset_bb = testset
+        #all_rf_model = all_rf_model
+    )
+
+
+saveRDS(
+    rf_model_results,
+    "./data/processed/random_forest_model_results.RDS"
+)
+
+```
+
+## Checking performance on test data
+```{r, eval = TRUE}
+
+rf_model_results <-
+    readRDS("./data/processed/random_forest_model_results.RDS")
+
+
+# print confusion matrix results
+rf_model_results$conf_mat_bb
+
+confusion_df <- rf_model_results$confusion_df_bb
+
+ggplot(confusion_df, aes(x = Reference, y = Prediction, fill = proportion)) +
+    geom_tile() +
+    coord_equal() +
+    scale_fill_distiller(palette = "Greens", direction = 1) +
+    geom_text(aes(label = round(proportion, 2)), color = "black", size = 3) +
+    theme_classic() +
+    labs(x = "Observed", y = "Predicted") +
+    theme(axis.text.x = element_text(
+        color = "black",
+        size = 11,
+        angle = 30,
+        vjust = 0.8,
+        hjust = 0.8
+    ))
+
+```
+
+
+# To-do list
+
+- arreglar subtipos vacíos (NAs) y con etiquetas 5 y 44
+- buscar ejemplos específicos de subtipos raros para aumentar n de entrenamiento
+- buscar grabaciones completas (o cortes) con subtipos raros para n de prueba
+
+
+Flats: sin cambios de frecuencia iguales o mayores a 5 kHz dentro del mismo llamado. 
+Trill: 1 cambio de frecuencia mayor o igual a 5 kHz, 2 cambios de 4 kHz, 3 o más cambios de 3 kHz cada uno.
+Steps: Un cambio igual o mayor a 5 kHz entre cada componente y no deben estar distanciadas más de 0.05 segundos (50 milisegundos). 
+Con éstos criterios se hacen todas las demás combinaciones de trills-trills, step-flats, step-trills, etc. 
+
+Si ud ya tiene los flats (1), trills (4) y complex (6), solo es necesario sacar los que son step-flats, step-trills y trills-trills.
+
+
+<!-- light green box -->
+
+::: {.alert .alert-success}
+# Takeaways {#takeaways .unnumbered .unlisted}
+:::
+
+ 
+
+<!-- '---' adds a gray vertical line -->
+
+------------------------------------------------------------------------
+
+ 
+
+<!-- add packages used, system details and versions  -->
+
+<font size="4">Session information</font>
+
+```{r session info, echo=F}
+
+sessionInfo()
+
+```
+
