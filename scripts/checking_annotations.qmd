@@ -76,19 +76,6 @@ knitr::opts_chunk$set(
 &nbsp; 
 
 
-<!-- light brown box -->
-<div class="alert alert-warning">
-
-# Report overview
-
-  - [Acoustic analysis](#acoustic-analysis)
-  - [Statistical analysis](#statistical-analysis)
-
-</div>
-
-&nbsp;
-
-
 # Load packages {.unnumbered .unlisted}
 
 ```{r load packages}
@@ -97,7 +84,7 @@ knitr::opts_chunk$set(
 # formatR is used for soft-wrapping code
 
 # install/ load packages
-sketchy::load_packages(packages = c("knitr", "formatR", "viridis", "warbleR", github = "maRce10/Rraven", github = "maRce10/warbleR", github = "maRce10/ohun", "caret", "randomForest"))
+sketchy::load_packages(packages = c("knitr", "formatR", "viridis", "warbleR", github = "maRce10/Rraven", github = "maRce10/warbleR", github = "maRce10/ohun", "caret", "randomForest", "DiagrammeR"))
 
 warbleR_options(wav.path = "/media/m/Expansion/audios_cin_alcohol_2023")
 
@@ -107,7 +94,6 @@ warbleR_options(wav.path = "/media/m/Expansion/audios_cin_alcohol_2023")
 ```{r, eval = TRUE}
 
 anns <- imp_raven("./data/processed/annotations", warbler.format = TRUE, all.data = TRUE)
-
 
 anns$subc <- anns$subtipos_completo <- NULL
 
@@ -129,9 +115,11 @@ anns$subtype.label[anns$subtipos == 6] <- "complex"
 
 ```
 
-# Describe annotations on single element subtypes
+# Describe annotations (single element subtypes)
 
-Proportion of calls per subtype 
+- Proportion of calls per subtype
+- This is the annotation data without any modification
+
 ```{r}
 
 count_types <- round(table(anns$subtype.label)/ nrow(anns), 2)
@@ -142,6 +130,57 @@ count_types$Count <- as.vector(table(anns$subtype.label))
 names(count_types) <- c("Subtype", "Proportion", "Count")
 
 count_types
+```
+
+
+# Data analysis
+
+```{mermaid}
+
+flowchart LR
+  A[Annotations] --> C(Measure\nsingle-note\nsubtype\nstructure)
+  B[recordings] --> C
+  C --> D(Build\ncomposed\nsubtypes)
+  C --> E(Classify\nsimple\nsubtypes) 
+  D --> F(Classify\ncomposed\nsubtypes)
+  F --> G(Evaluate classification)
+  E --> G
+  
+style A fill:#44015466
+style B fill:#3E4A894D
+style C fill:#26828E4D
+style D fill:#31688E4D
+style E fill:#6DCD594D
+style G fill:#FDE7254D
+
+```
+
+```{r, eval = FALSE, echo = FALSE}
+
+
+
+# r must be changed to dot
+
+digraph {
+
+graph [layout = dot]
+
+# define the global styles of the nodes. We can override these in box if we wish
+node [shape = rectangle, style = filled, fillcolor = Linen]
+
+annotations [label = "Annotations", shape = rectangle, fillcolor = "#44015466"]
+recordings [label = "Recordings", shape = rectangle, fillcolor = "#3E4A894D"]
+structure [label = "Measure\nsingle-note\nsubtype\nstructure", fillcolor = "#26828E4D"]
+simple [label = "Classify\nsimple\nsubtypes", fillcolor = "#6DCD594D"]
+bcomposed [label = "Build\ncomposed\nsubtypes", fillcolor = "#31688E4D"]
+class [label = "Classify\ncomposed\nsubtypes", fillcolor = "#6DCD594D"]
+eval [label = "Evaluate classification", fillcolor = "#FDE7254D"]
+# edge definitions with the node IDs
+{annotations recordings}  -> structure -> bcomposed -> class -> eval
+structure -> simple
+simple -> eval
+}
+
 ```
 
 
@@ -192,6 +231,21 @@ write.csv(anns, "./data/processed/annotations_groups_spectrogram_and_mel_feature
 ```
 
 
+<!-- light brown box -->
+<div class="alert alert-warning">
+
+## Rules to determine composed subtypes
+
+- If any of the composing subtypes is complex then **composed complex**
+- If it contains 3 or more single subtypes then **composed complex**
+- If  'flat-trill' and 'trill-flat' then  **step flat trill**
+- If it has at least two adjacent trills ('trill-trill') and the frequency change is equal or higher than 5 kHz then **step trill**
+- If it has at least two adjacent flats ('flat-flat') and the frequency change is equal or higher than 5 kHz then **step flat**
+
+</div>
+
+&nbsp;
+
 ```{r, eval = FALSE}
 
 anns <- read.csv("./data/processed/annotations_groups_spectrogram_and_mel_features.csv")
@@ -213,7 +267,7 @@ composed_anns_list <- lapply(unique(na.omit(anns$ovlp.sels)), function(x){
 
 composed_anns <- do.call(rbind, composed_anns_list)
 
-# unique(composed_anns$subtypes)
+unique(composed_anns$subtypes)
 
 
 # subtypes <- c(1 = "flat", 4 = "trill", 6 = "complejas", 22 = "22 kHz")
@@ -275,6 +329,11 @@ composed_anns$subtype.label <- ifelse(grepl("composed.trill", composed_anns$comp
 
 write.csv(composed_anns, "./data/processed/annotations_composed_subtypes_5ms.csv", row.names = FALSE)
 
+anns$type <- "single"
+anns$composed.subtype.label <- anns$subtype.label
+
+composed_anns$type <- "composed"
+
 cols <- intersect(colnames(anns), colnames(composed_anns))
 
 combined_anns <- rbind(anns[is.na(anns$ovlp.sels), cols], composed_anns[, cols])
@@ -285,7 +344,7 @@ write.csv(combined_anns, "./data/processed/annotations_simple_and_composed_subty
 
 # Summary
 
-Proportion of calls per subtype composed subtypes
+Proportion of calls per subtypes for composed (multi-element) subtypes
 ```{r}
 
 composed_anns <- read.csv("./data/processed/annotations_composed_subtypes_5ms.csv")
@@ -300,7 +359,34 @@ names(count_types) <- c("Subtype", "Proportion", "Count")
 count_types
 ```
 
-Proportion of calls per subtype single and composed subtypes
+
+Combination of single element calls on each composed subtype
+
+```{r}
+subtypes <- c("1" = "flat", "4" = "trill", "6" = "complex", "22" = "22 kHz")
+
+composed_anns$single.type.combs <- composed_anns$subtypes
+
+for(i in seq_along(subtypes))
+    composed_anns$single.type.combs <- gsub(names(subtypes)[i], subtypes[i], composed_anns$single.type.combs)  
+
+count_types <- round(table(composed_anns$single.type.combs)/ nrow(composed_anns), 2)
+
+count_types <- as.data.frame(count_types)
+
+count_types$Count <- as.vector(table(composed_anns$single.type.combs))
+
+count_types$comp <- sapply(count_types$Var1, function(x) composed_anns$composed.subtype.label[composed_anns$single.type.combs == x][1])
+
+names(count_types) <- c("Single subtype combination", "Proportion", "Count", "Composed subtype")
+
+count_types <- count_types[order(count_types$`Composed subtype`), ]
+
+count_types[, c(4, 1:3)]
+```
+
+
+Proportion of calls per subtypes for both single and composed (multi-element) subtypes
 ```{r}
 
 combined_anns <- read.csv("./data/processed/annotations_simple_and_composed_subtypes_5ms.csv")
@@ -312,26 +398,114 @@ count_types <- as.data.frame(count_types)
 count_types$Count <- as.vector(table(combined_anns$subtype.label))
 names(count_types) <- c("Subtype", "Proportion", "Count")
 
+count_types$type <- sapply(count_types$Subtype, function(x) unique(combined_anns$type[combined_anns$subtype.label == x]))
+
+count_types
+
+```
+
+
+Proportion of calls per subtypes for both single and composed by type (single vs composed)
+```{r}
+
+combined_anns <- read.csv("./data/processed/annotations_simple_and_composed_subtypes_5ms.csv")
+
+count_types <- round(table(combined_anns$composed.subtype.label)/ nrow(combined_anns), 2)
+
+count_types <- as.data.frame(count_types)
+
+count_types$Count <- as.vector(table(combined_anns$composed.subtype.label))
+names(count_types) <- c("Subtype", "Proportion", "Count")
+
+count_types$type <- sapply(count_types$Subtype, function(x) unique(combined_anns$type[combined_anns$composed.subtype.label == x]))
+
 count_types
 
 ```
 
 # Create spectrograms
+
 ```{r, eval = FALSE}
 
 types <- unique(combined_anns$subtype.label)
 
-for(i in types){
-    X <- combined_anns[combined_anns$subtype.label == i, ]
-    catalog(X = X, nrow = 10, ncol = 12, same.time.scale = T, mar = 0.001, res = 100, pb = FALSE, spec.mar = 0.001, max.group.cols = 5, title = i, ovlp = 50, wl = 512, width = 15, height = 9, hatching = 0, cex = 1.3, fast.spec = FALSE, pal = viridis, img.prefix = i, rm.axes = TRUE, flim = c(min(X$bottom.freq), max(X$top.freq)) + c(-5, 5), alpha = 0.25, collevels = seq(-120, 0, 5), box = FALSE, lab.mar = 0.00001)
-
-    move_images(from = .Options$warbleR$path, to = "./output/catalogs", overwrite = TRUE, cut = TRUE, pb = FALSE)
+for (i in types[7:1]) {
+    print(i)
+    X <- combined_anns[combined_anns$subtype.label == i,]
+    
+    # subset
+    set.seed(123)
+    if (nrow(X) > 120)
+        X <- X[sample(seq_len(nrow(X)), 120),]
+    
+    nrw <- ncl <- 2
+    n <- nrow(X)
+    if (n > 4) {
+        nrw <- ncl <- ceiling(sqrt(n))
+        if (((nrw - 1) * ncl) >= n)
+            nrw <- nrw - 1
+    }
+    
+    # print catalog
+    catalog(
+        X = X,
+        nrow = nrw,
+        ncol = ncl,
+        same.time.scale = T,
+        mar = 0.001,
+        res = 100,
+        pb = FALSE,
+        spec.mar = 0.001,
+        max.group.cols = 5,
+        title = i,
+        ovlp = 50,
+        wl = 512,
+        width = 15,
+        height = 9,
+        hatching = 0,
+        cex = 1.3,
+        fast.spec = FALSE,
+        pal = viridis,
+        img.prefix = i,
+        rm.axes = TRUE,
+        flim = c(min(X$bottom.freq), max(X$top.freq)) + c(-1, 1),
+        alpha = 0.25,
+        collevels = seq(-120, 0, 5),
+        box = FALSE,
+        lab.mar = 0.00001
+    )
+    
+    move_images(
+        from = .Options$warbleR$path,
+        to = "./output/catalogs",
+        overwrite = TRUE,
+        cut = TRUE,
+        pb = FALSE
+    )
 }
 
 ```
 
-# Classification
-## Random forest
+
+## Single element subtypes
+
+![Flat](flat-Catalog_p1.jpeg)
+
+![Trill](trill-Catalog_p1.jpeg)
+![Complex](complex-Catalog_p1.jpeg)
+
+## Composed subtypes
+
+![Step flat](step.flat-Catalog_p1.jpeg)
+
+![Step trill](step.trill-Catalog_p1.jpeg)
+
+![Step flat trill](step.flat.trill-Catalog_p1.jpeg)
+# Random forest classification
+
+Models trained for 100 iterations on 75% of the data and tested on the remaining 25%.
+
+## On single element subtypes 
 ```{r, eval = FALSE}
 
 elm_anns <- read.csv("./data/processed/annotations_groups_spectrogram_and_mel_features.csv")
@@ -428,7 +602,7 @@ saveRDS(
 
 ```
 
-## Checking performance on test data
+### Checking performance on test data
 ```{r, eval = TRUE}
 
 rf_model_results <-
@@ -457,26 +631,288 @@ ggplot(confusion_df, aes(x = Reference, y = Prediction, fill = proportion)) +
 
 ```
 
+## On composed (multi-element) subtypes 
 
-# To-do list
+Summarize structure at the multi-element subtype level
+```{r, eval = FALSE}
+elm_anns <- read.csv("./data/processed/annotations_groups_spectrogram_and_mel_features.csv")
 
-- arreglar subtipos vacíos (NAs) y con etiquetas 5 y 44
-- buscar ejemplos específicos de subtipos raros para aumentar n de entrenamiento
-- buscar grabaciones completas (o cortes) con subtipos raros para n de prueba
+mean_colms <- c("duration", "meanfreq", "sd", "freq.median", "freq.Q25",  "freq.Q75",  "freq.IQR", "time.median", "time.Q25",  "time.Q75",  "time.IQR", "skew", "kurt", "sp.ent", "time.ent", "entropy", "sfm", "meandom", "mindom", "maxdom", "dfrange", "modindx", "startdom", "enddom",    "dfslope",   "meanpeakf", "min.cc1", "min.cc2",   "min.cc3",   "min.cc4",   "min.cc5", "min.cc6",   "min.cc7",   "min.cc8",   "min.cc9", "min.cc10",  "min.cc11",  "min.cc12",  "min.cc13", "min.cc14",  "min.cc15",  "min.cc16",  "min.cc17", "min.cc18", "min.cc19",  "min.cc20",  "min.cc21", "min.cc22",  "min.cc23",  "min.cc24",  "min.cc25", "max.cc1",   "max.cc2",   "max.cc3",   "max.cc4", "max.cc5",   "max.cc6",   "max.cc7",   "max.cc8", "max.cc9",   "max.cc10",  "max.cc11",  "max.cc12", "max.cc13",  "max.cc14",  "max.cc15",  "max.cc16", "max.cc17",  "max.cc18",  "max.cc19",  "max.cc20", "max.cc21",  "max.cc22",  "max.cc23",  "max.cc24", "max.cc25",  "median.cc1", "median.cc2", "median.cc3", "median.cc4", "median.cc5", "median.cc6", "median.cc7", "median.cc8", "median.cc9", "median.cc10", "median.cc11", "median.cc12", "median.cc13", "median.cc14", "median.cc15", "median.cc16", "median.cc17", "median.cc18", "median.cc19", "median.cc20", "median.cc21", "median.cc22", "median.cc23", "median.cc24", "median.cc25", "mean.cc1",  "mean.cc2", "mean.cc3",  "mean.cc4",  "mean.cc5",  "mean.cc6", "mean.cc7",  "mean.cc8",  "mean.cc9",  "mean.cc10", "mean.cc11", "mean.cc12", "mean.cc13", "mean.cc14",  "mean.cc15", "mean.cc16", "mean.cc17", "mean.cc18", "mean.cc19", "mean.cc20", "mean.cc21", "mean.cc22", "mean.cc23", "mean.cc24", "mean.cc25", "var.cc1", "var.cc2",   "var.cc3",   "var.cc4",   "var.cc5", "var.cc6",   "var.cc7",   "var.cc8",   "var.cc9", "var.cc10",  "var.cc11",  "var.cc12",  "var.cc13", "var.cc14",  "var.cc15",  "var.cc16",  "var.cc17", "var.cc18",  "var.cc19",  "var.cc20",  "var.cc21", "var.cc22",  "var.cc23",  "var.cc24",  "var.cc25", "skew.cc1",  "skew.cc2",  "skew.cc3",  "skew.cc4", "skew.cc5",  "skew.cc6",  "skew.cc7",  "skew.cc8", "skew.cc9",  "skew.cc10", "skew.cc11", "skew.cc12", "skew.cc13", "skew.cc14", "skew.cc15", "skew.cc16", "skew.cc17", "skew.cc18", "skew.cc19", "skew.cc20", "skew.cc21", "skew.cc22", "skew.cc23", "skew.cc24", "skew.cc25", "kurt.cc1",  "kurt.cc2",  "kurt.cc3", "kurt.cc4",  "kurt.cc5",  "kurt.cc6",  "kurt.cc7", "kurt.cc8",  "kurt.cc9",  "kurt.cc10", "kurt.cc11",  "kurt.cc12", "kurt.cc13", "kurt.cc14", "kurt.cc15", "kurt.cc16", "kurt.cc17", "kurt.cc18", "kurt.cc19", "kurt.cc20", "kurt.cc21", "kurt.cc22", "kurt.cc23", "kurt.cc24", "kurt.cc25", "mean.d1.cc", "var.d1.cc", "mean.d2.cc", "var.d2.cc")  
+
+composed_param <- song_param(X = elm_anns, song_colm = "composed.subtype", mean_colm = mean_colms)
+
+combined_anns <- read.csv("./data/processed/annotations_simple_and_composed_subtypes_5ms.csv")
 
 
-Flats: sin cambios de frecuencia iguales o mayores a 5 kHz dentro del mismo llamado. 
-Trill: 1 cambio de frecuencia mayor o igual a 5 kHz, 2 cambios de 4 kHz, 3 o más cambios de 3 kHz cada uno.
-Steps: Un cambio igual o mayor a 5 kHz entre cada componente y no deben estar distanciadas más de 0.05 segundos (50 milisegundos). 
-Con éstos criterios se hacen todas las demás combinaciones de trills-trills, step-flats, step-trills, etc. 
+composed_param$composed.subtype.label <- sapply(composed_param$composed.subtype, function(x) unique(combined_anns$composed.subtype.label[combined_anns$composed.subtype == x]))
 
-Si ud ya tiene los flats (1), trills (4) y complex (6), solo es necesario sacar los que son step-flats, step-trills y trills-trills.
 
+write.csv(composed_param, "./data/processed/accoustic_features_simple_and_composed_subtypes.csv", row.names = FALSE)
+```
+
+### Train model
+```{r, eval = FALSE}
+
+composed_param <- read.csv("./data/processed/accoustic_features_simple_and_composed_subtypes.csv")
+
+# keep only multi-element
+composed_param <- composed_param[composed_param$num.elms > 1, ]
+
+composed_param$song.rate[is.infinite(composed_param$song.rate)] <- mean(composed_param$song.rate[!is.infinite(composed_param$song.rate)])
+
+# remove collinear
+target_features <- names(composed_param)[!names(composed_param) %in%  c("sound.files", "selec", "View", "Channel", "start", "end", "bottom.freq", "top.freq", "Delta.Time..s.", "Begin.File", "subtipos", "selec.file", "true.end", "ovlp.sels", "composed.subtype", "subtype.label", "composed.subtype.label", names(composed_param)[sapply(composed_param, anyNA)])]
+
+cormat <- cor(composed_param[, target_features], use = "pairwise.complete.obs")
+hc <- findCorrelation(cormat, cutoff= 0.9) # putt any value as a "cutoff" 
+hc <- sort(hc)
+
+target_features <- target_features[hc]
+
+# Create data subsets
+partition <- createDataPartition(
+    y = composed_param$composed.subtype.label,
+    times = 1,
+    p = 0.75,
+    list = FALSE
+)
+
+
+
+composed_param$composed_param$composed.subtype.label <- as.factor(composed_param$composed.subtype.label)
+
+trainset <- composed_param[partition, c(target_features, "composed.subtype.label")]
+testset <- composed_param[-partition, c(target_features, "composed.subtype.label")]
+
+trcontrol <-
+    trainControl(
+        method = "repeatedcv",
+        number = 100,
+        repeats = 100,
+        savePredictions = TRUE,
+        sampling = "down",
+        classProbs = TRUE,
+        returnResamp = "all"
+    )
+
+pred_model <- train(
+    composed.subtype.label ~ .,
+    data = trainset,
+    method = "rf",
+    trControl = trcontrol,
+    metric = "Accuracy",
+    preProcess = "scale"
+)
+
+# ggplot(pred_model) + theme_bw()
+
+# save confusion matrix
+conf_mat <-
+    confusionMatrix(predict(pred_model, testset), as.factor(testset$composed.subtype.label))
+
+conf_df <- as.data.frame(conf_mat$table)
+
+conf_df$total <-
+    sapply(conf_df$Reference, function(x)
+        sum(testset$composed.subtype.label ==
+                x))
+
+conf_df$proportion <- conf_df$Freq / conf_df$total
+
+# fit model on complete data set
+best_rf_model <- pred_model$finalModel
+
+# all_rf_model <- randomForest(
+#   subtype.label ~ .,
+#   data = elm_anns[, c(target_features, "subtype.label")],  # Your entire dataset
+#   proximity = TRUE,  # Include proximity matrix
+#   ntree = best_rf_model$ntree,  # Number of trees
+#   mtry = best_rf_model$mtry,    # Number of variables tried for splitting at each node
+#   nodesize = best_rf_model$nodesize,  # Minimum size of terminal nodes
+#   maxnodes = best_rf_model$maxnodes  # Maximum number of terminal nodes
+# )
+
+rf_model_results <-
+    list(
+        pred_model_bb = pred_model,
+        conf_mat_bb = conf_mat,
+        confusion_df_bb = conf_df,
+        testset_bb = testset
+        #all_rf_model = all_rf_model
+    )
+
+saveRDS(
+    rf_model_results,
+    "./data/processed/random_forest_model_results_composed_subtypes.RDS"
+)
+
+```
+
+### Checking performance on test data
+```{r, eval = TRUE}
+
+rf_model_results <-
+    readRDS("./data/processed/random_forest_model_results_composed_subtypes.RDS")
+
+
+# print confusion matrix results
+rf_model_results$conf_mat_bb
+
+confusion_df <- rf_model_results$confusion_df_bb
+
+ggplot(confusion_df, aes(x = Reference, y = Prediction, fill = proportion)) +
+    geom_tile() +
+    coord_equal() +
+    scale_fill_distiller(palette = "Greens", direction = 1) +
+    geom_text(aes(label = round(proportion, 2)), color = "black", size = 3) +
+    theme_classic() +
+    labs(x = "Observed", y = "Predicted") +
+    theme(axis.text.x = element_text(
+        color = "black",
+        size = 11,
+        angle = 30,
+        vjust = 0.8,
+        hjust = 0.8
+    ))
+
+```
+
+## On single and composed (multi-element) subtypes 
+
+### Train model
+```{r, eval = FALSE}
+
+composed_param <- read.csv("./data/processed/accoustic_features_simple_and_composed_subtypes.csv")
+
+composed_param <- composed_param[composed_param$composed.subtype.label != "22 kHz", ]
+
+composed_param$song.rate[is.infinite(composed_param$song.rate)] <- mean(composed_param$song.rate[!is.infinite(composed_param$song.rate)])
+
+# remove collinear
+target_features <- names(composed_param)[!names(composed_param) %in%  c("sound.files", "selec", "View", "Channel", "start", "end", "bottom.freq", "top.freq", "Delta.Time..s.", "Begin.File", "subtipos", "selec.file", "true.end", "ovlp.sels", "composed.subtype", "subtype.label", "composed.subtype.label" , "song.rate", names(composed_param)[sapply(composed_param, anyNA)])]
+
+cormat <- cor(composed_param[, target_features], use = "pairwise.complete.obs")
+hc <- findCorrelation(cormat, cutoff= 0.9) # putt any value as a "cutoff" 
+hc <- sort(hc)
+
+target_features <- target_features[hc]
+
+# Create data subsets
+partition <- createDataPartition(
+    y = composed_param$composed.subtype.label,
+    times = 1,
+    p = 0.75,
+    list = FALSE
+)
+
+
+
+composed_param$composed_param$composed.subtype.label <- as.factor(composed_param$composed.subtype.label)
+
+trainset <- composed_param[partition, c(target_features, "composed.subtype.label")]
+testset <- composed_param[-partition, c(target_features, "composed.subtype.label")]
+
+trcontrol <-
+    trainControl(
+        method = "repeatedcv",
+        number = 100,
+        repeats = 100,
+        savePredictions = TRUE,
+        sampling = "down",
+        classProbs = TRUE,
+        returnResamp = "all"
+    )
+
+pred_model <- train(
+    composed.subtype.label ~ .,
+    data = trainset,
+    method = "rf",
+    trControl = trcontrol,
+    metric = "Accuracy",
+    preProcess = "scale"
+)
+
+ggplot(pred_model) + theme_bw()
+
+# save confusion matrix
+conf_mat <-
+    confusionMatrix(predict(pred_model, testset), as.factor(testset$composed.subtype.label))
+
+conf_df <- as.data.frame(conf_mat$table)
+
+conf_df$total <-
+    sapply(conf_df$Reference, function(x)
+        sum(testset$composed.subtype.label ==
+                x))
+
+conf_df$proportion <- conf_df$Freq / conf_df$total
+
+# fit model on complete data set
+best_rf_model <- pred_model$finalModel
+
+# all_rf_model <- randomForest(
+#   subtype.label ~ .,
+#   data = elm_anns[, c(target_features, "subtype.label")],  # Your entire dataset
+#   proximity = TRUE,  # Include proximity matrix
+#   ntree = best_rf_model$ntree,  # Number of trees
+#   mtry = best_rf_model$mtry,    # Number of variables tried for splitting at each node
+#   nodesize = best_rf_model$nodesize,  # Minimum size of terminal nodes
+#   maxnodes = best_rf_model$maxnodes  # Maximum number of terminal nodes
+# )
+
+rf_model_results <-
+    list(
+        pred_model_bb = pred_model,
+        conf_mat_bb = conf_mat,
+        confusion_df_bb = conf_df,
+        testset_bb = testset
+        #all_rf_model = all_rf_model
+    )
+
+saveRDS(
+    rf_model_results,
+    "./data/processed/random_forest_model_results_single_and_composed_subtypes.RDS"
+)
+
+```
+
+### Checking performance on test data
+```{r, eval = TRUE}
+
+rf_model_results <-
+    readRDS("./data/processed/random_forest_model_results_single_and_composed_subtypes.RDS")
+
+# print confusion matrix results
+rf_model_results$conf_mat_bb
+
+confusion_df <- rf_model_results$confusion_df_bb
+
+ggplot(confusion_df, aes(x = Reference, y = Prediction, fill = proportion)) +
+    geom_tile() +
+    coord_equal() +
+    scale_fill_distiller(palette = "Greens", direction = 1) +
+    geom_text(aes(label = round(proportion, 2)), color = "black", size = 3) +
+    theme_classic() +
+    labs(x = "Observed", y = "Predicted") +
+    theme(axis.text.x = element_text(
+        color = "black",
+        size = 11,
+        angle = 30,
+        vjust = 0.8,
+        hjust = 0.8
+    ))
+
+```
 
 <!-- light green box -->
 
 ::: {.alert .alert-success}
 # Takeaways {#takeaways .unnumbered .unlisted}
+
+- Good classification of single element subtypes (accuracy: 0.76) 
+- Poor classification of composed subtypes (accuracy: 0.52 and 0.37 when including single-element subtypes)
+
+
 :::
 
  
@@ -487,7 +923,25 @@ Si ud ya tiene los flats (1), trills (4) y complex (6), solo es necesario sacar 
 
  
 
-<!-- add packages used, system details and versions  -->
+
+# To-do list
+
+- Try other classification methods (VGGish, BirdNet, google model)
+- arreglar subtipos vacíos (NAs) y con etiquetas 5 y 44
+- buscar ejemplos específicos de subtipos raros para aumentar n de entrenamiento
+- buscar grabaciones completas (o cortes) con subtipos raros para n de prueba
+
+```{r, eval = FALSE, echo=FALSE}
+# Flats: sin cambios de frecuencia iguales o mayores a 5 kHz dentro del mismo llamado. 
+# Trill: 1 cambio de frecuencia mayor o igual a 5 kHz, 2 cambios de 4 kHz, 3 o más cambios de 3 kHz cada uno.
+# Steps: Un cambio igual o mayor a 5 kHz entre cada componente y no deben estar distanciadas más de 0.05 segundos (50 milisegundos). 
+# Con éstos criterios se hacen todas las demás combinaciones de trills-trills, step-flats, step-trills, etc. 
+# 
+# Si ud ya tiene los flats (1), trills (4) y complex (6), solo es necesario sacar los que son step-flats, step-trills y trills-trills.
+
+```
+
+
 
 <font size="4">Session information</font>
 

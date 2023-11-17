@@ -3,3 +3,5 @@
 .RData
 .Ruserdata
 data/processed/random_forest_model_results.RDS
+data/processed/random_forest_model_results_composed_subtypes.RDS
+data/processed/random_forest_model_results_single_and_composed_subtypes.RDS
